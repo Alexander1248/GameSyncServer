@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: "GameServer"
+  security:
+    user:
+      name: admin
+      password: admin
+
+
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: create
+      naming:
+        implicit-strategy: org.hibernate.boot.model.naming.ImplicitNamingStrategyJpaCompliantImpl
+    properties:
+      hibernate:
+        format_sql: true
+    database: postgresql
+
+  datasource:
+    name: "users"
+    url: "jdbc:postgresql://localhost:5432/gameserver"
+    username: "admin"
+    password: "gameserver_87468757"
