@@ -24,9 +24,9 @@ public class GameSessionController {
         this.template = template;
     }
 
-    @PostMapping("/send/{server}")
+    @PostMapping("/send")
     public ResponseEntity<String> send(
-            @PathVariable String server,
+            @RequestParam String server,
             @RequestParam String type,
             @RequestParam(required = false) String user,
             @RequestBody byte[] data) {
@@ -41,22 +41,35 @@ public class GameSessionController {
 
         var msg = new GameMessage(source.getUsername(), type, data);
         if (user != null)
-            template.convertAndSendToUser(user, "/sessions/" + server, msg);
+            template.convertAndSendToUser(user, "/service/" + server, msg);
         else
-            template.convertAndSend("/sessions/" + server, msg);
+            template.convertAndSend("/service/" + server, msg);
         return new ResponseEntity<>("Message sent!", HttpStatus.OK);
     }
 
-    @PostMapping("/create/{server}")
-    public ResponseEntity<String> create(@PathVariable String server) {
-        return service.create(server);
+    @PostMapping("/create")
+    public ResponseEntity<String> create(@RequestParam String server) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication instanceof AnonymousAuthenticationToken || !authentication.isAuthenticated())
+            return new ResponseEntity<>("User not authorized!", HttpStatus.UNAUTHORIZED);
+        return service.create(server, (User) authentication.getPrincipal());
     }
-    @PostMapping("/connect/{server}")
-    public ResponseEntity<String> connect(@PathVariable String server) {
+    @PostMapping("/connect")
+    public ResponseEntity<String> connect(@RequestParam String server) {
         return service.connect(server);
     }
-    @PostMapping("/disconnect/{server}")
-    public ResponseEntity<String> disconnect(@PathVariable String server) {
+    @PostMapping("/disconnect")
+    public ResponseEntity<String> disconnect(@RequestParam String server) {
         return service.disconnect(server);
+    }
+
+    @PatchMapping("/rename")
+    public ResponseEntity<String> rename(@RequestParam String server, @RequestParam String name) {
+        return service.rename(server, name);
+    }
+
+    @DeleteMapping("/close")
+    public ResponseEntity<String> close(@RequestParam String server) {
+        return service.close(server);
     }
 }

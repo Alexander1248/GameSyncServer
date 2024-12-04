@@ -33,6 +33,7 @@ public class AuthChannelInterceptor implements ChannelInterceptor {
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
 
+        System.out.println(accessor);
         if (accessor.getCommand() != StompCommand.CONNECT
                 && accessor.getCommand() != StompCommand.SUBSCRIBE
                 && accessor.getCommand() != StompCommand.SEND)
@@ -45,9 +46,10 @@ public class AuthChannelInterceptor implements ChannelInterceptor {
         if (auth == null || !auth.isAuthenticated())
             throw new MessagingException(message, "User not authenticated!");
 
-        if (accessor.getCommand() != StompCommand.SUBSCRIBE)
-            return message;
+        if (accessor.getCommand() != StompCommand.SUBSCRIBE) return message;
         String server = accessor.getDestination();
+        if (!server.startsWith("/service/")) return message;
+        server = server.substring("/service/".length());
 
         if (!service.exists(server))
             throw new MessagingException(message, "Server not found!");

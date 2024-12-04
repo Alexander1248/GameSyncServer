@@ -9,7 +9,4 @@ public interface GameSessionRepository extends JpaRepository<GameSession, Long> 
 
     boolean existsById(long id);
     boolean existsByName(String name);
-
-    void removeById(long id);
-    void removeByName(String name);
 }

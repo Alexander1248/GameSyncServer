@@ -26,6 +26,9 @@ public class GameSession {
     @OneToMany
     private List<User> users;
 
+    @OneToMany
+    private List<User> admins;
+
     public GameSession(String name) {
         this.name = name;
         users = new ArrayList<>();

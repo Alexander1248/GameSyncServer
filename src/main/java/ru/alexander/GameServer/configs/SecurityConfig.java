@@ -32,16 +32,7 @@ public class SecurityConfig {
                         .requestMatchers("/users/**").authenticated()
                         .requestMatchers("/ws/**").permitAll()
                         .anyRequest().permitAll()
-                )
-                .formLogin(form -> form
-                        .loginPage("/login")
-                        .loginProcessingUrl("/login")
-                        .defaultSuccessUrl("/users/list")
-                        .permitAll())
-                .logout(logout -> logout
-                        .logoutRequestMatcher(new AntPathRequestMatcher("/auth/logout"))
-                        .permitAll())
-                .csrf(AbstractHttpConfigurer::disable)
+                ).csrf(AbstractHttpConfigurer::disable)
                 .addFilterBefore(new AuthFilter(headerAuthProvider), BasicAuthenticationFilter.class);
         return http.build();
     }

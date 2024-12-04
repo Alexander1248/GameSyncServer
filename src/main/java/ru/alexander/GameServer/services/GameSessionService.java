@@ -22,13 +22,15 @@ public class GameSessionService {
     public GameSessionService(GameSessionRepository gameSessionRepository) {
         this.gameSessionRepository = gameSessionRepository;
     }
-    public ResponseEntity<String> create(String name) {
+    public ResponseEntity<String> create(String name, User admin) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication instanceof AnonymousAuthenticationToken || !authentication.isAuthenticated())
             return new ResponseEntity<>("User not authorized!", HttpStatus.UNAUTHORIZED);
         if (gameSessionRepository.existsByName(name))
             return new ResponseEntity<>("Server with this name already exists!", HttpStatus.CONFLICT);
-        gameSessionRepository.save(new GameSession(name));
+        GameSession session = new GameSession(name);
+        session.getUsers().add(admin);
+        gameSessionRepository.save(session);
         return new ResponseEntity<>("Server created!", HttpStatus.CREATED);
     }
 
@@ -49,6 +51,22 @@ public class GameSessionService {
             return new ResponseEntity<>("Disconnected successfully!", HttpStatus.OK);
         });
     }
+    public ResponseEntity<String> rename(String name, String newName) {
+        return executeForSession(name, (session, user) -> {
+            if (!session.getAdmins().contains(user))
+                return new ResponseEntity<>("User not admin!", HttpStatus.CONFLICT);
+            session.setName(newName);
+            return new ResponseEntity<>("Renamed successfully!", HttpStatus.OK);
+        });
+    }
+    public ResponseEntity<String> close(String name) {
+        return executeForSession(name, (session, user) -> {
+            if (!session.getAdmins().contains(user))
+                return new ResponseEntity<>("User not admin!", HttpStatus.CONFLICT);
+            gameSessionRepository.deleteById(session.getId());
+            return new ResponseEntity<>("Renamed successfully!", HttpStatus.OK);
+        });
+    }
 
     private ResponseEntity<String> executeForSession(String name, BiFunction<GameSession, User, ResponseEntity<String>> action) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -65,6 +83,16 @@ public class GameSessionService {
     public boolean isConnected(String name, User user) {
         if (gameSessionRepository.existsByName(name))
             return gameSessionRepository.findByName(name).getUsers().contains(user);
+        return false;
+    }
+    public boolean isAdmin(String name, User user) {
+        if (gameSessionRepository.existsByName(name))
+            return gameSessionRepository.findByName(name).getAdmins().contains(user);
+        return false;
+    }
+    public boolean addAdmin(String name, User user) {
+        if (gameSessionRepository.existsByName(name))
+            return gameSessionRepository.findByName(name).getAdmins().add(user);
         return false;
     }
 }
