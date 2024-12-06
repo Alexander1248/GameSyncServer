@@ -14,7 +14,7 @@ import ru.alexander.GameServer.services.UserService;
 import java.util.regex.Pattern;
 
 @RestController
-@RequestMapping("http")
+@RequestMapping
 public class AuthController {
 
     private final UserService userService;

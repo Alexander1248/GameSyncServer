@@ -56,6 +56,9 @@ public class GameSessionService {
             if (!sessionUserRepository.existsBySessionAndUser(session, user))
                 return new ResponseEntity<>("User not connected!", HttpStatus.CONFLICT);
             sessionUserRepository.removeBySessionAndUser(session, user);
+            if (sessionUserRepository.findAllBySession(session).isEmpty())
+                gameSessionRepository.deleteById(session.getId());
+
             return new ResponseEntity<>("Disconnected successfully!", HttpStatus.OK);
         });
     }
