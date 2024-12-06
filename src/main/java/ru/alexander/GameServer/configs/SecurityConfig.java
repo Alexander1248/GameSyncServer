@@ -32,7 +32,8 @@ public class SecurityConfig {
                         .requestMatchers("/users/**").authenticated()
                         .requestMatchers("/ws/**").permitAll()
                         .anyRequest().permitAll()
-                ).csrf(AbstractHttpConfigurer::disable)
+                )
+                .csrf(AbstractHttpConfigurer::disable)
                 .addFilterBefore(new AuthFilter(headerAuthProvider), BasicAuthenticationFilter.class);
         return http.build();
     }

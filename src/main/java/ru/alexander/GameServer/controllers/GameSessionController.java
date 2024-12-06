@@ -49,27 +49,38 @@ public class GameSessionController {
 
     @PostMapping("/create")
     public ResponseEntity<String> create(@RequestParam String server) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication instanceof AnonymousAuthenticationToken || !authentication.isAuthenticated())
-            return new ResponseEntity<>("User not authorized!", HttpStatus.UNAUTHORIZED);
-        return service.create(server, (User) authentication.getPrincipal());
+        return service.create(server);
     }
     @PostMapping("/connect")
-    public ResponseEntity<String> connect(@RequestParam String server) {
+    public ResponseEntity<?> connect(@RequestParam String server) {
         return service.connect(server);
     }
     @PostMapping("/disconnect")
-    public ResponseEntity<String> disconnect(@RequestParam String server) {
+    public ResponseEntity<?> disconnect(@RequestParam String server) {
         return service.disconnect(server);
+    }
+    @PatchMapping("/ban")
+    public ResponseEntity<?> users(@RequestParam String server, @RequestParam String user) {
+        return service.ban(server, user);
+    }
+    @PatchMapping("/op")
+    public ResponseEntity<?> addAdmin(@RequestParam String server,
+                                      @RequestParam String user,
+                                      @RequestParam(defaultValue = "true") boolean admin) {
+        return service.changeAdmin(server, user, admin);
     }
 
     @PatchMapping("/rename")
-    public ResponseEntity<String> rename(@RequestParam String server, @RequestParam String name) {
+    public ResponseEntity<?> rename(@RequestParam String server, @RequestParam String name) {
         return service.rename(server, name);
+    }
+    @PatchMapping("/users")
+    public ResponseEntity<?> users(@RequestParam String server) {
+        return service.users(server);
     }
 
     @DeleteMapping("/close")
-    public ResponseEntity<String> close(@RequestParam String server) {
+    public ResponseEntity<?> close(@RequestParam String server) {
         return service.close(server);
     }
 }

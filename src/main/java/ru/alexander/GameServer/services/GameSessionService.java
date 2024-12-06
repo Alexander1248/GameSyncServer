@@ -8,8 +8,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.alexander.GameServer.models.GameSession;
+import ru.alexander.GameServer.models.SessionUser;
 import ru.alexander.GameServer.models.User;
 import ru.alexander.GameServer.repositories.GameSessionRepository;
+import ru.alexander.GameServer.repositories.SessionUserRepository;
+import ru.alexander.GameServer.repositories.UserRepository;
 
 import java.util.function.BiFunction;
 
@@ -18,57 +21,81 @@ import java.util.function.BiFunction;
 public class GameSessionService {
 
     private final GameSessionRepository gameSessionRepository;
+    private final SessionUserRepository sessionUserRepository;
+    private final UserRepository userRepository;
 
-    public GameSessionService(GameSessionRepository gameSessionRepository) {
+    public GameSessionService(GameSessionRepository gameSessionRepository, SessionUserRepository sessionUserRepository, UserRepository userRepository) {
         this.gameSessionRepository = gameSessionRepository;
+        this.sessionUserRepository = sessionUserRepository;
+        this.userRepository = userRepository;
     }
-    public ResponseEntity<String> create(String name, User admin) {
+    public ResponseEntity<String> create(String name) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication instanceof AnonymousAuthenticationToken || !authentication.isAuthenticated())
             return new ResponseEntity<>("User not authorized!", HttpStatus.UNAUTHORIZED);
         if (gameSessionRepository.existsByName(name))
             return new ResponseEntity<>("Server with this name already exists!", HttpStatus.CONFLICT);
+        User user = (User) authentication.getPrincipal();
         GameSession session = new GameSession(name);
-        session.getUsers().add(admin);
         gameSessionRepository.save(session);
+        sessionUserRepository.save(new SessionUser(session, user, true));
         return new ResponseEntity<>("Server created!", HttpStatus.CREATED);
     }
 
-    public ResponseEntity<String> connect(String name) {
+    public ResponseEntity<?> connect(String name) {
         return executeForSession(name, (session, user) -> {
-            if (session.getUsers().contains(user))
+            if (sessionUserRepository.existsBySessionAndUser(session, user))
                 return new ResponseEntity<>("User already connected!", HttpStatus.CONFLICT);
-            session.getUsers().add(user);
+            sessionUserRepository.save(new SessionUser(session, user));
             return new ResponseEntity<>("Connected successfully!", HttpStatus.OK);
         });
     }
 
-    public ResponseEntity<String> disconnect(String name) {
+    public ResponseEntity<?> disconnect(String name) {
         return executeForSession(name, (session, user) -> {
-            if (!session.getUsers().contains(user))
+            if (!sessionUserRepository.existsBySessionAndUser(session, user))
                 return new ResponseEntity<>("User not connected!", HttpStatus.CONFLICT);
-            session.getUsers().remove(user);
+            sessionUserRepository.removeBySessionAndUser(session, user);
             return new ResponseEntity<>("Disconnected successfully!", HttpStatus.OK);
         });
     }
-    public ResponseEntity<String> rename(String name, String newName) {
+    public ResponseEntity<?> rename(String name, String newName) {
         return executeForSession(name, (session, user) -> {
-            if (!session.getAdmins().contains(user))
-                return new ResponseEntity<>("User not admin!", HttpStatus.CONFLICT);
+            if (!sessionUserRepository.existsBySessionAndUser(session, user))
+                return new ResponseEntity<>("User not connected!", HttpStatus.CONFLICT);
+            if (!sessionUserRepository.findBySessionAndUser(session, user).isAdmin())
+                return new ResponseEntity<>("User not admin!", HttpStatus.FORBIDDEN);
             session.setName(newName);
             return new ResponseEntity<>("Renamed successfully!", HttpStatus.OK);
         });
     }
-    public ResponseEntity<String> close(String name) {
+    public ResponseEntity<?> close(String name) {
         return executeForSession(name, (session, user) -> {
-            if (!session.getAdmins().contains(user))
-                return new ResponseEntity<>("User not admin!", HttpStatus.CONFLICT);
+            if (!sessionUserRepository.existsBySessionAndUser(session, user))
+                return new ResponseEntity<>("User not connected!", HttpStatus.CONFLICT);
+            if (!sessionUserRepository.findBySessionAndUser(session, user).isAdmin())
+                return new ResponseEntity<>("User not admin!", HttpStatus.FORBIDDEN);
             gameSessionRepository.deleteById(session.getId());
             return new ResponseEntity<>("Renamed successfully!", HttpStatus.OK);
         });
     }
+    public ResponseEntity<?> ban(String name, String banned) {
+        return executeForSession(name, (session, user) -> {
+            if (!sessionUserRepository.existsBySessionAndUser(session, user))
+                return new ResponseEntity<>("User not connected!", HttpStatus.CONFLICT);
+            if (!sessionUserRepository.findBySessionAndUser(session, user).isAdmin())
+                return new ResponseEntity<>("User not admin!", HttpStatus.FORBIDDEN);
+            if (!userRepository.existsByUsername(banned))
+                return new ResponseEntity<>("User not found!", HttpStatus.CONFLICT);
+            var bannedUser = userRepository.findByUsername(banned);
+            if (!sessionUserRepository.existsBySessionAndUser(session, bannedUser))
+                return new ResponseEntity<>("User for ban not connected!", HttpStatus.CONFLICT);
+            sessionUserRepository.removeBySessionAndUser(session, bannedUser);
+            return new ResponseEntity<>("Banned successfully!", HttpStatus.OK);
+        });
+    }
 
-    private ResponseEntity<String> executeForSession(String name, BiFunction<GameSession, User, ResponseEntity<String>> action) {
+    private ResponseEntity<?> executeForSession(String name, BiFunction<GameSession, User, ResponseEntity<?>> action) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication instanceof AnonymousAuthenticationToken || !authentication.isAuthenticated())
             return new ResponseEntity<>("User not authorized!", HttpStatus.UNAUTHORIZED);
@@ -80,19 +107,54 @@ public class GameSessionService {
     public boolean exists(String name) {
         return gameSessionRepository.existsByName(name);
     }
+    public boolean isConnected(String name, String user) {
+        if (gameSessionRepository.existsByName(name))
+            return sessionUserRepository.findBySessionAndUser(
+                    gameSessionRepository.findByName(name),
+                    userRepository.findByUsername(user)
+            ).isAdmin();
+        return false;
+    }
     public boolean isConnected(String name, User user) {
         if (gameSessionRepository.existsByName(name))
-            return gameSessionRepository.findByName(name).getUsers().contains(user);
+            return sessionUserRepository.findBySessionAndUser(
+                    gameSessionRepository.findByName(name),
+                    user
+            ).isAdmin();
         return false;
     }
-    public boolean isAdmin(String name, User user) {
-        if (gameSessionRepository.existsByName(name))
-            return gameSessionRepository.findByName(name).getAdmins().contains(user);
+    public boolean isAdmin(String name, String user) {
+        if (gameSessionRepository.existsByName(name) && userRepository.existsByUsername(user))
+            return sessionUserRepository.findBySessionAndUser(
+                    gameSessionRepository.findByName(name),
+                    userRepository.findByUsername(user)
+            ).isAdmin();
         return false;
     }
-    public boolean addAdmin(String name, User user) {
-        if (gameSessionRepository.existsByName(name))
-            return gameSessionRepository.findByName(name).getAdmins().add(user);
-        return false;
+    public ResponseEntity<?> changeAdmin(String name, String username, boolean admin) {
+        return executeForSession(name, (session, user) -> {
+            if (!sessionUserRepository.existsBySessionAndUser(session, user))
+                return new ResponseEntity<>("User not connected!", HttpStatus.CONFLICT);
+            if (!sessionUserRepository.findBySessionAndUser(session, user).isAdmin())
+                return new ResponseEntity<>("User not admin!", HttpStatus.FORBIDDEN);
+            if (!userRepository.existsByUsername(username))
+                return new ResponseEntity<>("User not found!", HttpStatus.CONFLICT);
+            var opedUser = userRepository.findByUsername(username);
+            if (!sessionUserRepository.existsBySessionAndUser(session, opedUser))
+                return new ResponseEntity<>("User for op not connected!", HttpStatus.CONFLICT);
+            sessionUserRepository.findBySessionAndUser(
+                    gameSessionRepository.findByName(name),
+                    opedUser
+            ).setAdmin(admin);
+            return new ResponseEntity<>("Oped successfully!", HttpStatus.OK);
+        });
+    }
+
+    public ResponseEntity<?> users(String name) {
+        return executeForSession(name, (session, user) -> {
+            if (!sessionUserRepository.existsBySessionAndUser(session, user))
+                return new ResponseEntity<>("User not connected!", HttpStatus.CONFLICT);
+            return new ResponseEntity<>(sessionUserRepository.findAllBySession(session), HttpStatus.OK);
+        });
     }
 }

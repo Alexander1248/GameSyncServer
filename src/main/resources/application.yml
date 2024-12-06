@@ -6,7 +6,6 @@ spring:
       name: admin
       password: admin
 
-
   jpa:
     show-sql: true
     hibernate:

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
+import org.springframework.lang.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,15 +24,8 @@ public class GameSession {
     @Column(unique=true, nullable=false)
     private String name;
 
-    @OneToMany
-    private List<User> users;
-
-    @OneToMany
-    private List<User> admins;
-
     public GameSession(String name) {
         this.name = name;
-        users = new ArrayList<>();
     }
 
     public GameSession() {}
