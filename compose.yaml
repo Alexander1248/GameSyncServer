@@ -8,3 +8,16 @@ services:
       - 'POSTGRES_USER=admin'
     ports:
       - "5432:5432"
+  app:
+    container_name: gameserver
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - 'SPRING_DATASOURCE_URL=jdbc:postgresql://main_db:5432/gameserver'
+      - 'SPRING_DATASOURCE_USERNAME=admin'
+      - 'SPRING_DATASOURCE_PASSWORD=gameserver_87468757'
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
